@@ -62,6 +62,9 @@ struct files_struct {
 	unsigned long open_fds_init[1];
 	unsigned long full_fds_bits_init[1];
 	struct file __rcu * fd_array[NR_OPEN_DEFAULT];
+#ifdef CONFIG_SNAPSHOT
+	unsigned long *snapshot_open_fds;
+#endif
 };
 
 struct file_operations;

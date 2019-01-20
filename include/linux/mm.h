@@ -24,6 +24,10 @@
 #include <linux/err.h>
 #include <linux/page_ref.h>
 
+#ifdef CONFIG_SNAPSHOT
+#include <linux/sched.h>
+#endif
+
 struct mempolicy;
 struct anon_vma;
 struct anon_vma_chain;
@@ -2452,6 +2456,87 @@ static inline bool page_is_guard(struct page *page) { return false; }
 void __init setup_nr_node_ids(void);
 #else
 static inline void setup_nr_node_ids(void) {}
+#endif
+
+#ifdef CONFIG_SNAPSHOT
+static inline struct snapshot_page *get_snapshot_page(
+				struct mm_struct *mm, unsigned long page_base) {
+	struct snapshot_page *sp;
+
+	// printk("[WEN] in is_snapshot_page\n");
+	hash_for_each_possible(mm->ss.ss_page, sp, next, page_base) {
+		// printk("[WEN] try hash page: 0x%08lx\n", sp->page_base);
+		if (sp->page_base == page_base)
+			return sp;
+	}		
+
+	return NULL;
+} 
+
+static inline bool is_snapshot_page_none_pte(struct snapshot_page *sp) {
+	return sp->page_prot & SNAPSHOT_NONE_PTE;	
+}
+
+static inline bool is_snapshot_page_cow(struct snapshot_page *sp) {
+	return sp->page_prot & SNAPSHOT_COW;
+}
+
+static inline bool is_snapshot_page_private(struct snapshot_page *sp) {
+	return sp->page_prot & SNAPSHOT_PRIVATE;
+}
+
+static inline void set_snapshot_page_none_pte(struct snapshot_page *sp) {
+	sp->page_prot |= SNAPSHOT_NONE_PTE;
+}
+
+static inline void set_snapshot_page_private(struct snapshot_page *sp) {
+	sp->page_prot |= SNAPSHOT_PRIVATE;
+}
+
+static inline void set_snapshot_page_cow(struct snapshot_page *sp) {
+	sp->page_prot |= SNAPSHOT_COW;
+}
+
+static inline void clear_snapshot(struct mm_struct *mm) {
+	mm->ss.status &= ~SNAPSHOT_MADE;
+}
+
+static inline void set_had_snapshot(struct mm_struct *mm) {
+    mm->ss.status |= SNAPSHOT_HAD; 
+}
+
+static inline void set_snapshot(struct mm_struct *mm) {
+	mm->ss.status |= SNAPSHOT_MADE;
+}	
+
+static inline bool had_snapshot(struct mm_struct *mm) {
+    return !!(mm->ss.status & SNAPSHOT_HAD);
+}
+
+static inline bool have_snapshot(struct mm_struct *mm) {
+	return !!(mm->ss.status & SNAPSHOT_MADE);
+}	
+
+static inline void snapshot_cleanup(struct task_struct *tsk) {
+	struct pt_regs *regs = task_pt_regs(tsk);
+	// printk("current ip: 0x%08lx bp: 0x%08lx sp: 0x%08lx\n", regs->ip, regs->bp, regs->sp);
+	// printk("current ip: 0x%08lx\n", regs->ip);
+	regs->ip = tsk->mm->ss.ucontext->cleanup;
+	// regs->cs = tsk->mm->ss.regs->cs;
+	// regs->sp = tsk->mm->ss.ucontext->sp;
+	// regs->ss = tsk->mm->ss.regs->ss;
+	// regs->bp = tsk->mm->ss.ucontext->bp;
+	// printk("after recover ip: 0x%08lx\n", regs->ip, regs->bp, regs->sp);
+	// printk("after recover ip: 0x%08lx\n", regs->ip);
+}
+
+extern unsigned long zap_pte_range(struct mmu_gather *tlb,
+				struct vm_area_struct *vma, pmd_t *pmd,
+				unsigned long addr, unsigned long end,
+				struct zap_details *details);
+
+extern void clean_snapshot(void);
+
 #endif
 
 #endif /* __KERNEL__ */

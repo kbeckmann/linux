@@ -2758,6 +2758,12 @@ config VMD
 	  single domain. If you know your system provides one of these and
 	  has devices attached to it, say Y; if you are not sure, say N.
 
+config SNAPSHOT
+	def_bool y
+
+config SNAPSHOT_DEBUG
+	def_bool n
+
 source "net/Kconfig"
 
 source "drivers/Kconfig"

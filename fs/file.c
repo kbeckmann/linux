@@ -375,6 +375,10 @@ struct files_struct *dup_fd(struct files_struct *oldf, int *errorp)
 
 	rcu_assign_pointer(newf->fdt, new_fdt);
 
+#ifdef CONFIG_SNAPSHOT
+    newf->snapshot_open_fds = NULL;
+#endif
+
 	return newf;
 
 out_release:

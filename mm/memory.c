@@ -1106,7 +1106,7 @@ int copy_page_range(struct mm_struct *dst_mm, struct mm_struct *src_mm,
 	return ret;
 }
 
-static unsigned long zap_pte_range(struct mmu_gather *tlb,
+/* static */unsigned long zap_pte_range(struct mmu_gather *tlb,
 				struct vm_area_struct *vma, pmd_t *pmd,
 				unsigned long addr, unsigned long end,
 				struct zap_details *details)
@@ -2362,6 +2362,64 @@ static int do_wp_page(struct fault_env *fe, pte_t orig_pte)
 	struct vm_area_struct *vma = fe->vma;
 	struct page *old_page;
 
+#ifdef CONFIG_SNAPSHOT
+	struct mm_struct *mm = vma->vm_mm;
+	struct snapshot_page *ss_page = NULL;
+	pte_t entry;
+	char *vfrom;	
+
+	if (have_snapshot(mm))
+		ss_page = get_snapshot_page(mm, fe->address & PAGE_MASK);
+	else
+		goto normal;
+
+	if (!ss_page || !ss_page->valid)
+		/* not a snapshot'ed page */
+		goto normal; 
+
+	/* the page has been copied?
+	 * the page becomes COW page again. we do not need to take care of it.
+	 */
+	if (ss_page->has_been_copied)
+		goto normal;
+
+	/* reserved old page data */
+    if (ss_page->page_data == NULL)
+	    ss_page->page_data = kmalloc(PAGE_SIZE, GFP_KERNEL);
+	old_page = pfn_to_page(pte_pfn(orig_pte));
+	vfrom = kmap_atomic(old_page);
+	memcpy(ss_page->page_data, vfrom, PAGE_SIZE);	
+	kunmap_atomic(vfrom);
+
+    ss_page->has_been_copied = true;
+
+	/* check if it is not COW/demand paging but the private page 
+	 * whose prot is set from rw to ro by snapshot.
+	 */
+	if (is_snapshot_page_private(ss_page)) {
+		// printk("[WEN] page fault! process: %s addr: 0x%08lx ptep: 0x%08lx pte: 0x%08lx\n", 
+		//		current->comm, fe->address, (unsigned long)fe->pte, orig_pte.pte);
+
+		/* change the page prot back to ro from rw */
+		entry = pte_mkwrite(orig_pte);
+		set_pte_at(mm, fe->address, fe->pte, entry);
+		flush_tlb_page(vma, fe->address & PAGE_MASK);		
+
+		/*
+		printk("[WEN] page_data: 0x%08lx +0xb0: 0x%08lx, pte: 0x%08lx\n", 
+					(unsigned long)(ss_page->page_data),
+					*(unsigned long *)(ss_page->page_data + 0xb0),
+					fe->pte->pte);
+		*/
+
+		pte_unmap_unlock(fe->pte, fe->ptl);
+		return 0;
+	}	
+
+	/* if it is a COW page, kernel will handle everything. */
+#endif
+
+normal:
 	old_page = vm_normal_page(vma, fe->address, orig_pte);
 	if (!old_page) {
 		/*
@@ -2739,6 +2797,10 @@ static int do_anonymous_page(struct fault_env *fe)
 	struct mem_cgroup *memcg;
 	struct page *page;
 	pte_t entry;
+#ifdef CONFIG_SNAPSHOT
+	struct mm_struct *mm = vma->vm_mm;
+	struct snapshot_page *ss_page = NULL;
+#endif
 
 	/* File mapping without ->vm_ops ? */
 	if (vma->vm_flags & VM_SHARED)
@@ -2792,6 +2854,23 @@ static int do_anonymous_page(struct fault_env *fe)
 	if (mem_cgroup_try_charge(page, vma->vm_mm, GFP_KERNEL, &memcg, false))
 		goto oom_free_page;
 
+#ifdef CONFIG_SNAPSHOT
+	if (have_snapshot(mm))
+		ss_page = get_snapshot_page(mm, fe->address & PAGE_MASK);
+	else
+		goto normal;
+
+	if (!ss_page || !ss_page->valid)
+		/* not a snapshot'ed page */
+		goto normal;
+
+	// printk("do_anonymous_page address: 0x%08lx\n", fe->address);
+    
+    // HAVE PTE NOW
+	ss_page->has_had_pte = true;
+#endif
+
+normal:
 	/*
 	 * The memory barrier inside __SetPageUptodate makes sure that
 	 * preceeding stores to the page contents become visible before

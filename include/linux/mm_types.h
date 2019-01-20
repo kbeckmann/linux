@@ -16,6 +16,7 @@
 #include <asm/page.h>
 #include <asm/mmu.h>
 
+
 #ifndef AT_VECTOR_SIZE_ARCH
 #define AT_VECTOR_SIZE_ARCH 0
 #endif
@@ -360,6 +361,52 @@ struct vm_area_struct {
 	struct vm_userfaultfd_ctx vm_userfaultfd_ctx;
 };
 
+#ifdef CONFIG_SNAPSHOT
+#include <linux/hashtable.h>
+
+struct snapshot_vma {
+	unsigned long vm_start;
+	unsigned long vm_end;
+	struct snapshot_vma *vm_next;
+};
+
+struct snapshot_page {
+	unsigned long page_base;
+	unsigned long page_prot;
+	void *page_data;
+
+    bool has_been_copied;
+	bool has_had_pte;
+    bool valid;
+
+	struct hlist_node next;
+};
+
+#define SNAPSHOT_NONE 0x00000000 // outside snapshot
+#define SNAPSHOT_MADE 0x00000001 // in snapshot
+#define SNAPSHOT_HAD  0x00000002 // once had snapshot
+
+#define SNAPSHOT_HASHTABLE_SZ 0x8
+
+struct snapshot_context {
+	unsigned long cleanup;
+	unsigned long sp;
+	unsigned long bp;
+};
+
+struct snapshot {
+	unsigned int status;
+	struct snapshot_context *ucontext;
+	unsigned long oldbrk;
+	struct snapshot_vma *ss_mmap;
+	DECLARE_HASHTABLE(ss_page, SNAPSHOT_HASHTABLE_SZ);
+};
+
+#define SNAPSHOT_PRIVATE 			0x00000001
+#define SNAPSHOT_COW	 			0x00000002
+#define SNAPSHOT_NONE_PTE 			0x00000010
+#endif
+
 struct core_thread {
 	struct task_struct *task;
 	struct core_thread *next;
@@ -517,6 +564,10 @@ struct mm_struct {
 #endif
 #ifdef CONFIG_MMU
 	struct work_struct async_put_work;
+#endif
+
+#ifdef CONFIG_SNAPSHOT
+	struct snapshot ss;
 #endif
 };
 

@@ -933,6 +933,13 @@ do_group_exit(int exit_code)
 
 	BUG_ON(exit_code & 0x80); /* core dumps don't get here */
 
+#ifdef CONFIG_SNAPSHOT
+	/* not called directly by exit/_exit from the user OR exit/_exit called outside snapshot*/
+	if (current->mm && had_snapshot(current->mm)) {
+		clean_snapshot();	
+	}
+#endif
+
 	if (signal_group_exit(sig))
 		exit_code = sig->group_exit_code;
 	else if (!thread_group_empty(current)) {
@@ -961,7 +968,15 @@ do_group_exit(int exit_code)
  */
 SYSCALL_DEFINE1(exit_group, int, error_code)
 {
+#ifdef CONFIG_SNAPSHOT
+	if (current->mm && have_snapshot(current->mm)) {
+		snapshot_cleanup(current);	
+		goto out;
+	}
+#endif
 	do_group_exit((error_code & 0xff) << 8);
+
+out:
 	/* NOTREACHED */
 	return 0;
 }

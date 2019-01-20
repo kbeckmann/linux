@@ -833,6 +833,7 @@ asmlinkage long sys_syncfs(int fd);
 
 asmlinkage long sys_fork(void);
 asmlinkage long sys_vfork(void);
+
 #ifdef CONFIG_CLONE_BACKWARDS
 asmlinkage long sys_clone(unsigned long, unsigned long, int __user *, unsigned long,
 	       int __user *);
@@ -898,4 +899,8 @@ asmlinkage long sys_copy_file_range(int fd_in, loff_t __user *off_in,
 
 asmlinkage long sys_mlock2(unsigned long start, size_t len, int flags);
 
+#endif
+
+#ifdef CONFIG_SNAPSHOT
+asmlinkage long sys_snapshot(unsigned long option, unsigned long arg);
 #endif
