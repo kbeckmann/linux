@@ -861,13 +861,15 @@
  */
 #define DISCARDS							\
 	/DISCARD/ : {							\
-	EXIT_TEXT							\
-	EXIT_DATA							\
-	EXIT_CALL							\
-	*(.discard)							\
-	*(.discard.*)							\
-	*(.modinfo)							\
 	}
+
+	// EXIT_TEXT							\
+	// EXIT_DATA							\
+	// EXIT_CALL							\
+
+	// *(.discard)							\
+	// *(.discard.*)							\
+	// *(.modinfo)							\
 
 /**
  * PERCPU_INPUT - the percpu input sections
