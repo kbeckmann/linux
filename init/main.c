@@ -1,3 +1,5 @@
+#pragma clang attribute push (__attribute__((no_sanitize("address"))), apply_to=function)
+
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  *  linux/init/main.c
@@ -457,6 +459,7 @@ static int __init do_early_param(char *param, char *val,
 {
 	const struct obs_kernel_param *p;
 
+#if 1
 	for (p = __setup_start; p < __setup_end; p++) {
 		if ((p->early && parameq(param, p->str)) ||
 		    (strcmp(param, "console") == 0 &&
@@ -466,6 +469,7 @@ static int __init do_early_param(char *param, char *val,
 				pr_warn("Malformed early option '%s'\n", param);
 		}
 	}
+#endif
 	/* We accept everything at this stage. */
 	return 0;
 }
@@ -608,6 +612,7 @@ asmlinkage __visible void __init start_kernel(void)
 	/* parameters may set static keys */
 	jump_label_init();
 	parse_early_param();
+#if 1
 	after_dashes = parse_args("Booting kernel",
 				  static_command_line, __start___param,
 				  __stop___param - __start___param,
@@ -615,6 +620,7 @@ asmlinkage __visible void __init start_kernel(void)
 	if (!IS_ERR_OR_NULL(after_dashes))
 		parse_args("Setting init args", after_dashes, NULL, 0, -1, -1,
 			   NULL, set_init_arg);
+#endif
 
 	/*
 	 * These use large bootmem allocations and must precede
@@ -1179,7 +1185,9 @@ static noinline void __init kernel_init_freeable(void)
 
 	init_mm_internals();
 
+#if 1
 	do_pre_smp_initcalls();
+#endif
 	lockup_detector_init();
 
 	smp_init();
@@ -1222,3 +1230,4 @@ static noinline void __init kernel_init_freeable(void)
 
 	integrity_load_keys();
 }
+#pragma clang attribute pop

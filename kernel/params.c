@@ -1,3 +1,6 @@
+#pragma clang attribute push (__attribute__((no_sanitize("address"))), apply_to=function)
+
+
 // SPDX-License-Identifier: GPL-2.0-or-later
 /* Helpers for initial module or kernel cmdline parsing
    Copyright (C) 2001 Rusty Russell.
@@ -946,3 +949,5 @@ static int __init param_sysfs_init(void)
 subsys_initcall(param_sysfs_init);
 
 #endif /* CONFIG_SYSFS */
+
+#pragma clang attribute pop
