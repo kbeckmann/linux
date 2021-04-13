@@ -314,6 +314,7 @@ static long _gettid(void)
 
 static void *page_alloc(unsigned long size)
 {
+#if 1
 	void *addr;
 
 	addr = mmap(NULL, size, PROT_READ | PROT_WRITE,
@@ -323,11 +324,18 @@ static void *page_alloc(unsigned long size)
 		return NULL;
 
 	return addr;
+#else
+	return malloc(size);
+#endif
 }
 
 static void page_free(void *addr, unsigned long size)
 {
+#if 1
 	munmap((void *)addr, size);
+#else
+	free(addr);
+#endif
 }
 
 #ifdef LKL_HOST_CONFIG_VFIO_PCI
