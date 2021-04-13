@@ -350,13 +350,53 @@ int main(int argc, char **argv)
 	if (!cla.printk)
 		lkl_host_ops.print = NULL;
 
-	disk.fd = open(cla.fsimg_path, O_RDONLY);
+// #ifdef __AFL_HAVE_MANUAL_CONTROL
+//   __AFL_INIT();
+// #endif
+	lkl_start_kernel(&lkl_host_ops, "mem=10M");
+
+
+// read base image to ram
+	FILE *fp = fopen("nilfs2_clean.bin", "rb");
+	if (!fp) {
+		return -1;
+	}
+	fseek(fp, 0, SEEK_END);
+	int file_len = ftell(fp);
+	fseek(fp, 0, SEEK_SET);
+	uint8_t *base_img = malloc(file_len);
+	int file_read = fread(base_img, 1, file_len, fp);
+	fclose(fp);
+
+
+
+
+//   while (__AFL_LOOP(100000)) {
+
+    /* Read input data. */
+    /* Call library code to be fuzzed. */
+    /* Reset state. */
+
+	/* Load input from AFL (stdin) */
+	char buf[512 * 1024];
+	int buf_len = read(0, buf, sizeof(buf));
+	if (buf_len < 0) {
+		return -2;
+	}
+	//printf("[.] %d bytes from stdin\n", buf_len);
+
+	disk.fd = open(cla.fsimg_path, O_RDWR | O_CREAT, 0666);
 	if (disk.fd < 0) {
 		fprintf(stderr, "can't open fsimg %s: %s\n", cla.fsimg_path,
 			strerror(errno));
 		ret = 1;
 		goto out;
 	}
+
+	write(disk.fd, base_img, file_len);
+	lseek(disk.fd, 0x400, SEEK_SET);
+	write(disk.fd, buf, buf_len); // write fuzz data
+	lseek(disk.fd, 0x0, SEEK_SET); // Seek to 0 again
 
 	disk.ops = NULL;
 
@@ -367,14 +407,16 @@ int main(int argc, char **argv)
 	}
 	disk_id = ret;
 
-	lkl_start_kernel(&lkl_host_ops, "mem=10M");
-
 	ret = lkl_mount_dev(disk_id, cla.part, cla.fsimg_type, LKL_MS_RDONLY,
 			    NULL, mpoint, sizeof(mpoint));
 	if (ret) {
 		fprintf(stderr, "can't mount disk: %s\n", lkl_strerror(ret));
 		goto out_close;
 	}
+
+//   }
+// HACK!
+return 0;
 
 	ret = lkl_sys_chdir(mpoint);
 	if (ret) {
@@ -399,6 +441,8 @@ out_umount:
 
 out_close:
 	close(disk.fd);
+
+//   }
 
 out:
 	lkl_sys_halt();
