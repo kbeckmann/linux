@@ -9,6 +9,7 @@ static void console_write(struct console *con, const char *str, unsigned len)
 		lkl_ops->print(str, len);
 }
 
+// #define CONFIG_LKL_EARLY_CONSOLE
 #ifdef CONFIG_LKL_EARLY_CONSOLE
 static struct console lkl_boot_console = {
 	.name	= "lkl_boot_console",
